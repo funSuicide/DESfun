@@ -84,18 +84,9 @@ p_table = (16, 7, 20, 21, 29, 12, 28, 17,
            19, 13, 30, 6, 22, 11, 4, 25)
 
 
-def binary_encode(s: str) -> str:  # готово
-    result = ''
-    for element in s:
-        tmp = bin(ord(element))[2:]
-        tmp = '%08d' % int(tmp)
-        result += tmp
-    return result
-
-
 def get_binary_block(text: str) -> list:  # готово
     result = []
-    tmp = binary_encode(text)
+    tmp = text
     while len(tmp) % 64 != 0:
         tmp += '0'
     for i in range(0, len(tmp), 64):
@@ -110,18 +101,10 @@ def p_expend(str: str) -> str:
     return result
 
 
-def replace_block(block: str) -> str:  # готово
+def replace_block(block: str, table) -> str:  # работает
     result = ''
-    for i in replace_table:
-        print(i-1)
+    for i in table:
         result += block[i - 1]
-    return result
-
-
-def end_replace_block(block: str) -> str:
-    result = ''
-    for i in invertation_replace_table:
-        result += block[invertation_replace_table[i]]
     return result
 
 
@@ -140,24 +123,27 @@ def extend_block(block: str) -> str:
     return result
 
 
+def dec_to_bin(x):
+    n = ""
+    while x > 0:
+        y = str(x % 2)
+        n = y + n
+        x = int(x / 2)
+    return n
+
+
 def s_extend(str: str, index: int) -> str:
-    result = ''
     tmp_1 = int((str[0] + str[5]), 2)
-    tmp_2 = int((str[1:4]), 2)
+    tmp_2 = int((str[1:5]), 2)
     tmp = s_table[index][tmp_1][tmp_2]
-    return bin(tmp)
-
-
-def process_key(key: str) -> str:
-    result = ''
-    for i in key_replace_table:
-        result += key[i - 1]
-    return result
+    tmp = dec_to_bin(tmp)
+    while len(tmp) < 4:
+        tmp = '0' + tmp
+    return tmp
 
 
 def spin_key(key: str):
-    tmp_key = process_key(key)
-    first, second = tmp_key[0: 28], tmp_key[28: 56]
+    first, second = key[0: 28], key[28: 56]
     spin_table = (1, 2, 4, 6, 8, 10, 12, 14, 15, 17, 19, 21, 23, 25, 27, 28)
     for i in range(1, 17):
         first_after_spin = first[spin_table[i - 1]:] + first[:spin_table[i - 1]]
@@ -190,8 +176,23 @@ def function(right: str, key_i: str) -> str:
 
 
 def encryption_cycle(block: str, key: str) -> str:
-    new_key = process_key(key)
+    new_key = replace_block(key, key_replace_table)
     child_keys = key_selection_replacement(new_key)
+    for i in range(16):
+        new_key = child_keys[i]
+        left = block[0:32]
+        right = block[32:64]
+        new_left = right
+        res_func = function(right, new_key)
+        right = not_or(left, res_func)
+        block = new_left + right
+    return block[32:] + block[:32]
+
+
+def decryption_cycle(block: str, key: str) -> str:
+    new_key = replace_block(key, key_replace_table)
+    child_keys = key_selection_replacement(new_key)
+    child_keys = list(reversed(child_keys))
     for i in range(16):
         new_key = child_keys[i]
         left = block[0:32]
@@ -206,17 +207,28 @@ def encryption_cycle(block: str, key: str) -> str:
 def encrypt(data: str, key: str) -> str:
     result = ''
     blocks = get_binary_block(data)
-    bin_key = binary_encode(key)
-    print(bin_key)
-    print(len(bin_key))
+    bin_key = key
     for i in blocks:
-        rep_block = replace_block(i)
+        rep_block = replace_block(i, replace_table)
         c_block = encryption_cycle(rep_block, bin_key)
-        end_rep_block = end_replace_block(c_block)
+        end_rep_block = replace_block(c_block, invertation_replace_table)
         result += end_rep_block
     return result
 
 
+def decrypt(data: str, key: str) -> str:
+    result = ''
+    blocks = get_binary_block(data)
+    bin_key = key
+    for i in blocks:
+        rep_block = replace_block(i, replace_table)
+        c_block = decryption_cycle(rep_block, bin_key)
+        end_rep_block = replace_block(c_block, invertation_replace_table)
+        result += end_rep_block
+    return result
 
 
-print(encrypt('Hello', 'Zanderrr'))
+print(encrypt('0100100001100101011011000110110001101111010000010101001101000100',
+              '0110111101110000011100110110000101100100011100010111000101110001'))
+print(decrypt('0100011000111110010000100010000011001000001111001100011101010101',
+              '0110111101110000011100110110000101100100011100010111000101110001'))
